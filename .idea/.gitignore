@@ -5,3 +5,7 @@ out/
 *.iml
 *.log
 .DS_Store
+
+# секреты
+.env
+*.local
