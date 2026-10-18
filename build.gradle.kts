@@ -3,7 +3,7 @@ plugins {
     application
 }
 
-group = "app"
+group = "chat"
 version = "1.0-SNAPSHOT"
 
 repositories {
@@ -27,12 +27,25 @@ dependencies {
     // Тесты
     testImplementation(platform("org.junit:junit-bom:5.10.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("org.assertj:assertj-core:3.25.3")
 }
 
 application {
-    mainClass.set("app.server.ServerMain")
+    mainClass.set("chat.moviechat.ChatApplication")
 }
 
 tasks.named<Test>("test") {
     useJUnitPlatform()
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    options.encoding = "UTF-8"
+}
+
+tasks.jar {
+    manifest {
+        attributes["Main-Class"] = "chat.moviechat.ChatApplication"
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from(configurations.runtimeClasspath.get().map { if (it.isDirectory) it else zipTree(it) })
 }

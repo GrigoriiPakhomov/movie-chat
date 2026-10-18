@@ -40,3 +40,9 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+# локальные секреты
+src/main/resources/application.properties
+# IntelliJ IDEA (полностью)
+.idea/
+*.iml
