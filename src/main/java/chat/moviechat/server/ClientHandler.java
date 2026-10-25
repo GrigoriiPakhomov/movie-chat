@@ -1,27 +1,29 @@
+
 package chat.moviechat.server;
 
-import lombok.extern.slf4j.Slf4j;
 import chat.moviechat.exception.MovieNotFoundException;
 import chat.moviechat.exception.ValidationException;
 import chat.moviechat.model.ClientSession;
 import chat.moviechat.model.Movie;
 import chat.moviechat.util.ConsoleColors;
 import chat.moviechat.util.ValidationUtil;
+import lombok.extern.slf4j.Slf4j;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 
-/**
- * Обработчик одного клиентского подключения: читает строки,
- * маршрутизирует сообщения и команды.
- */
 @Slf4j
 public class ClientHandler implements Runnable {
 
     private final Socket socket;
     private final ChatServer server;
     private final MessageBroadcaster broadcaster;
+
     private String username;
     private BufferedReader reader;
     private ClientSession session;
@@ -36,13 +38,12 @@ public class ClientHandler implements Runnable {
     public void run() {
         try {
             openStreams();
-            if (!handshake()) {
-                return;
+
+            if (handshake()) {
+                readLoop();
             }
-            broadcastUserJoined();
-            readLoop();
         } catch (IOException e) {
-            log.warn("Клиент {} отключился: {}", username, e.getMessage());
+            log.debug("Соединение с клиентом {} закрыто: {}", username, e.getMessage());
         } finally {
             cleanup();
         }
@@ -51,21 +52,39 @@ public class ClientHandler implements Runnable {
     private void openStreams() throws IOException {
         reader = new BufferedReader(
                 new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+
         BufferedWriter writer = new BufferedWriter(
                 new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
+
         session = new ClientSession("", writer);
     }
 
     private boolean handshake() throws IOException {
         session.send("Введите имя пользователя:");
+
         String input = reader.readLine();
+
         if (input == null) {
             return false;
         }
+
         try {
             ValidationUtil.validateUsername(input);
-            server.registerClient(input, session);
-            this.username = input;
+
+            // Регистрация и уведомление идут последовательно,
+            // чтобы события подключения не перемешивались между потоками.
+            synchronized (server) {
+                server.registerClient(input, session);
+                username = input;
+
+                String message = ConsoleColors.GREEN
+                        + username + " присоединился к чату (онлайн: "
+                        + server.getClientCount() + ")"
+                        + ConsoleColors.RESET;
+
+                broadcaster.broadcast(message);
+            }
+
             return true;
         } catch (ValidationException | IllegalArgumentException e) {
             session.send("❌ " + e.getMessage());
@@ -73,20 +92,9 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    /**
-     * Оповещает всех клиентов о присоединении нового пользователя.
-     *
-     * @throws IOException при ошибке рассылки
-     */
-    private void broadcastUserJoined() throws IOException {
-        String message = ConsoleColors.GREEN
-                + username + " присоединился к чату (онлайн: " + server.getClientCount() + ")"
-                + ConsoleColors.RESET;
-        broadcaster.broadcast(message);
-    }
-
     private void readLoop() throws IOException {
         String line;
+
         while ((line = reader.readLine()) != null) {
             handleLine(line);
         }
@@ -96,17 +104,18 @@ public class ClientHandler implements Runnable {
         if (line.isBlank()) {
             return;
         }
+
         try {
             if (line.startsWith("/")) {
                 handleCommand(line);
             } else {
                 ValidationUtil.validateMessage(line);
-                broadcaster.broadcast(String.format("[%s]: %s", username, line));
+                broadcaster.broadcast("[" + username + "]: " + line);
             }
         } catch (ValidationException e) {
             sendPrivate("❌ " + e.getMessage());
         } catch (Exception e) {
-            log.error("Ошибка обработки строки от {}", username, e);
+            log.error("Ошибка обработки сообщения от {}", username, e);
             sendPrivate("❌ Внутренняя ошибка сервера");
         }
     }
@@ -114,13 +123,14 @@ public class ClientHandler implements Runnable {
     private void handleCommand(String line) {
         String[] parts = line.split("\\s+", 2);
         String command = parts[0].toLowerCase();
-        String arg = parts.length > 1 ? parts[1] : "";
+        String argument = parts.length > 1 ? parts[1] : "";
 
         switch (command) {
-            case "/movie" -> handleMovie(arg);
-            case "/msg" -> handlePrivateMessage(arg);
+            case "/movie" -> handleMovie(argument);
+            case "/msg" -> handlePrivateMessage(argument);
             case "/users" -> sendPrivate("👥 Онлайн: " + server.getClientCount());
-            case "/help" -> sendPrivate("/movie <название> | /msg <имя> <текст> | /users | /quit");
+            case "/help" -> sendPrivate(
+                    "/movie <название> | /msg <имя> <текст> | /users | /quit");
             case "/quit" -> handleQuit();
             default -> sendPrivate("❌ Неизвестная команда: " + command);
         }
@@ -131,11 +141,12 @@ public class ClientHandler implements Runnable {
             sendPrivate("❌ Укажите название: /movie Inception");
             return;
         }
+
         try {
             Movie movie = server.getMovieService().searchMovie(query);
             broadcaster.broadcast(movie.toChatFormat());
         } catch (MovieNotFoundException e) {
-            broadcaster.broadcast("❌ Фильм не найден: " + query);
+            sendPrivate("❌ Фильм не найден: " + query);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             sendPrivate("❌ Запрос прерван");
@@ -145,25 +156,32 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    private void handlePrivateMessage(String arg) {
-        String[] parts = arg.split("\\s+", 2);
+    private void handlePrivateMessage(String argument) {
+        String[] parts = argument.split("\\s+", 2);
+
         if (parts.length < 2) {
             sendPrivate("❌ Формат: /msg <имя> <текст>");
             return;
         }
+
         String target = parts[0];
-        String text = parts[1];
+        String message = parts[1];
+
         try {
-            ValidationUtil.validateMessage(text);
+            ValidationUtil.validateMessage(message);
         } catch (ValidationException e) {
             sendPrivate("❌ " + e.getMessage());
             return;
         }
-        String formatted = String.format("%s[личное от %s]:%s %s",
-                ConsoleColors.CYAN, username, ConsoleColors.RESET, text);
+
+        String formatted = ConsoleColors.CYAN
+                + "[личное от " + username + "]:"
+                + ConsoleColors.RESET + " " + message;
+
         if (broadcaster.sendTo(target, formatted)) {
-            sendPrivate(String.format("%s[личное → %s]:%s %s",
-                    ConsoleColors.CYAN, target, ConsoleColors.RESET, text));
+            sendPrivate(ConsoleColors.CYAN
+                    + "[личное → " + target + "]:"
+                    + ConsoleColors.RESET + " " + message);
         } else {
             sendPrivate("❌ Пользователь не найден: " + target);
         }
@@ -174,32 +192,38 @@ public class ClientHandler implements Runnable {
             session.send("👋 До встречи, " + username + "!");
             socket.close();
         } catch (IOException e) {
-            log.debug("Ошибка закрытия сокета", e);
+            log.debug("Не удалось закрыть соединение клиента {}", username);
         }
     }
 
-    private void sendPrivate(String text) {
+    private void sendPrivate(String message) {
         try {
-            session.send(text);
+            session.send(message);
         } catch (IOException e) {
             log.debug("Не удалось отправить сообщение клиенту {}", username);
         }
     }
 
     private void cleanup() {
-        try {
-            if (username != null) {
+        if (username != null) {
+            synchronized (server) {
                 server.removeClient(username);
+
                 String message = ConsoleColors.RED
-                        + username + " покинул чат (онлайн: " + server.getClientCount() + ")"
+                        + username + " покинул чат (онлайн: "
+                        + server.getClientCount() + ")"
                         + ConsoleColors.RESET;
+
                 broadcaster.broadcast(message);
             }
-            if (socket != null && !socket.isClosed()) {
+        }
+
+        try {
+            if (!socket.isClosed()) {
                 socket.close();
             }
         } catch (IOException e) {
-            log.debug("Ошибка при очистке сессии", e);
+            log.debug("Ошибка закрытия соединения клиента {}", username);
         }
     }
 }

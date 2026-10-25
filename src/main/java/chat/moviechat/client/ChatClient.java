@@ -1,36 +1,58 @@
+
 package chat.moviechat.client;
 
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 
 /**
- * Консольный TCP-клиент чата.
- * .
+ * TCP-клиент чата для отправки и получения сообщений через сервер.
  */
 @Slf4j
 public class ChatClient {
+
+    private static final String QUIT_MARKER = "__QUIT__";
+    private static final String BROADCAST_PREFIX =
+            String.valueOf((char) 1) + "BROADCAST:";
 
     private final String host;
     private final int port;
     private final String username;
     private final BlockingQueue<String> input;
+    private final BlockingQueue<String> output;
     private volatile boolean running;
 
-    public ChatClient(String host, int port, String username, BlockingQueue<String> input) {
+    public ChatClient(
+            String host,
+            int port,
+            String username,
+            BlockingQueue<String> input
+    ) {
+        this(host, port, username, input, null);
+    }
+
+    public ChatClient(
+            String host,
+            int port,
+            String username,
+            BlockingQueue<String> input,
+            BlockingQueue<String> output
+    ) {
         this.host = host;
         this.port = port;
         this.username = username;
         this.input = input;
+        this.output = output;
     }
 
-    /**
-     * Подключается к серверу и запускает цикл обмена.
-     * Блокируется до отключения клиента.
-     */
     public void start() {
         try (Socket socket = new Socket(host, port);
              BufferedReader reader = new BufferedReader(
@@ -40,17 +62,16 @@ public class ChatClient {
 
             running = true;
 
-            String welcome = reader.readLine();
-            if (welcome != null) {
-                System.out.println("[" + username + "] " + welcome);
-            }
+            reader.readLine();
 
             writer.write(username);
             writer.newLine();
             writer.flush();
 
-            Thread readerThread = new Thread(() -> receiveLoop(reader),
-                    "reader-" + username);
+            Thread readerThread = new Thread(
+                    () -> receiveLoop(reader),
+                    "reader-" + username
+            );
             readerThread.setDaemon(true);
             readerThread.start();
 
@@ -64,23 +85,27 @@ public class ChatClient {
 
     private void sendLoop(BufferedWriter writer) throws IOException {
         while (running) {
-            String line;
+            String message;
+
             try {
-                line = input.take();
+                message = input.take();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return;
             }
-            if ("__QUIT__".equals(line)) {
+
+            if (QUIT_MARKER.equals(message)) {
                 writer.write("/quit");
                 writer.newLine();
                 writer.flush();
                 return;
             }
-            if (line.isBlank()) {
+
+            if (message.isBlank()) {
                 continue;
             }
-            writer.write(line);
+
+            writer.write(message);
             writer.newLine();
             writer.flush();
         }
@@ -88,14 +113,37 @@ public class ChatClient {
 
     private void receiveLoop(BufferedReader reader) {
         try {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                System.out.println("[" + username + "] " + line);
+            String message;
+
+            while ((message = reader.readLine()) != null) {
+                forwardMessage(message);
             }
         } catch (IOException e) {
             log.debug("Соединение закрыто для {}: {}", username, e.getMessage());
         } finally {
             running = false;
         }
+    }
+
+    private void forwardMessage(String message) {
+        if (output == null) {
+            log.info("[{}] {}", username, message);
+            return;
+        }
+
+        if (message.startsWith(BROADCAST_PREFIX)) {
+            String broadcast = message.substring(BROADCAST_PREFIX.length());
+            int separator = broadcast.indexOf(':');
+
+            if (separator >= 0) {
+                String id = broadcast.substring(0, separator);
+                String text = broadcast.substring(separator + 1);
+
+                output.offer("broadcast-" + id + "\t" + text);
+                return;
+            }
+        }
+
+        output.offer("message-" + UUID.randomUUID() + "\t[" + username + "] " + message);
     }
 }

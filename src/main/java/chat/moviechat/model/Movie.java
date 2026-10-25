@@ -20,7 +20,12 @@ public class Movie {
     private String rating;
 
     public String toChatFormat() {
-        return String.format(" Найден фильм: \"%s\" (%s). Жанр: %s. Рейтинг: %s.",
-                title, year, genre, rating);
+        return String.format(
+                "🎬 Найден фильм: \"%s\" (%s). Жанр: %s. Рейтинг: %s.",
+                title != null ? title : "—",
+                year != null ? year : "—",
+                genre != null ? genre : "—",
+                rating != null ? rating : "—"
+        );
     }
 }
