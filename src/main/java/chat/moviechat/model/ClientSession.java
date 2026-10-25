@@ -3,7 +3,6 @@ package chat.moviechat.model;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
 

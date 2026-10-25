@@ -1,4 +1,3 @@
-
 package chat.moviechat.server;
 
 import chat.moviechat.exception.MovieNotFoundException;
@@ -23,7 +22,6 @@ public class ClientHandler implements Runnable {
     private final Socket socket;
     private final ChatServer server;
     private final MessageBroadcaster broadcaster;
-
     private String username;
     private BufferedReader reader;
     private ClientSession session;
@@ -71,8 +69,6 @@ public class ClientHandler implements Runnable {
         try {
             ValidationUtil.validateUsername(input);
 
-            // Регистрация и уведомление идут последовательно,
-            // чтобы события подключения не перемешивались между потоками.
             synchronized (server) {
                 server.registerClient(input, session);
                 username = input;

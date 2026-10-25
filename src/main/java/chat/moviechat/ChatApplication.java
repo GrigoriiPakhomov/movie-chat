@@ -1,7 +1,4 @@
-
 package chat.moviechat;
-
-import chat.moviechat.runner.ChatRunner;
 
 /**
  * Точка входа в приложение Movie Chat.

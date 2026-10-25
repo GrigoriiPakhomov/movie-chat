@@ -1,4 +1,3 @@
-
 package chat.moviechat.util;
 
 import chat.moviechat.exception.ValidationException;

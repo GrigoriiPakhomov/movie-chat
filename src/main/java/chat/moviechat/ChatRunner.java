@@ -1,5 +1,4 @@
-
-package chat.moviechat.runner;
+package chat.moviechat;
 
 import chat.moviechat.client.ChatClient;
 import chat.moviechat.server.ChatServer;
@@ -13,7 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;

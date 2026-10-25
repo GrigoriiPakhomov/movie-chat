@@ -25,7 +25,6 @@ public class MovieService {
 
     private static final String OMDb_URL = "https://www.omdbapi.com/?t=%s&apikey=%s";
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
-
     private final HttpClient httpClient;
     private final String apiKey;
 
