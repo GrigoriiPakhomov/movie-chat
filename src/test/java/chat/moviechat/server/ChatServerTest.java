@@ -1,54 +1,53 @@
+
 package chat.moviechat.server;
 
-import chat.moviechat.model.ClientSession;
+import chat.moviechat.websocket.ChatWebSocketHandler;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.io.BufferedWriter;
-import java.io.StringWriter;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+/**
+ * Тесты сервера многопользовательского чата.
+ *
+ * Проверяется получение состояния сервера
+ * и количества подключённых пользователей.
+ */
 class ChatServerTest {
 
-    @Test
-    @DisplayName("Регистрирует клиента и увеличивает количество участников")
-    void registersClient() {
-        ChatServer server = new ChatServer(0);
+    private ChatWebSocketHandler webSocketHandler;
+    private ChatServer chatServer;
 
-        server.registerClient("Гриша", createSession());
-
-        assertEquals(1, server.getClientCount());
+    /**
+     * Создаёт тестовые зависимости перед каждым тестом.
+     */
+    @BeforeEach
+    void setUp() {
+        webSocketHandler = mock(ChatWebSocketHandler.class);
+        chatServer = new ChatServer(webSocketHandler);
     }
 
+    /**
+     * Проверяет получение количества пользователей онлайн.
+     */
     @Test
-    @DisplayName("Не позволяет зарегистрировать двух клиентов с одинаковым именем")
-    void rejectsDuplicateUsername() {
-        ChatServer server = new ChatServer(0);
+    @DisplayName("Возвращает количество подключённых пользователей")
+    void shouldReturnClientCount() {
+        when(webSocketHandler.getClientCount()).thenReturn(3);
 
-        server.registerClient("Гриша", createSession());
-
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> server.registerClient("Гриша", createSession())
-        );
-
-        assertEquals(1, server.getClientCount());
+        assertEquals(3, chatServer.getClientCount());
     }
 
+    /**
+     * Проверяет состояние запущенного сервера.
+     */
     @Test
-    @DisplayName("Удаляет отключившегося клиента из списка")
-    void removesClient() {
-        ChatServer server = new ChatServer(0);
-
-        server.registerClient("Гриша", createSession());
-        server.removeClient("Гриша");
-
-        assertEquals(0, server.getClientCount());
-    }
-
-    private ClientSession createSession() {
-        return new ClientSession("", new BufferedWriter(new StringWriter()));
+    @DisplayName("Сервер считается запущенным после инициализации")
+    void shouldReturnRunningStatus() {
+        assertTrue(chatServer.isRunning());
     }
 }
