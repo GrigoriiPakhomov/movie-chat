@@ -1,14 +1,15 @@
 package chat.moviechat;
 
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
 /**
  * Точка входа в приложение Movie Chat.
  */
-public final class ChatApplication {
-
-    private ChatApplication() {
-    }
+@SpringBootApplication
+public class ChatApplication {
 
     public static void main(String[] args) {
-        new ChatRunner().run(args);
+        SpringApplication.run(ChatApplication.class, args);
     }
 }

@@ -18,10 +18,12 @@ public class Movie {
     private String year;
     private String genre;
     private String rating;
+    private String poster;
+    private String plot;
 
     public String toChatFormat() {
         return String.format(
-                "🎬 Найден фильм: \"%s\" (%s). Жанр: %s. Рейтинг: %s.",
+                "🎬 %s (%s). Жанр: %s. Рейтинг IMDb: %s.",
                 title != null ? title : "—",
                 year != null ? year : "—",
                 genre != null ? genre : "—",

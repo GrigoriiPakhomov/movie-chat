@@ -1,0 +1,85 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Chat</title>
+    <link rel="stylesheet" href="/style.css">
+    <script src="/app.js" defer></script>
+</head>
+<body>
+
+<div class="login-screen" id="loginScreen">
+    <form class="login-card" id="loginForm">
+        <h1>Movie Chat</h1>
+        <p>Общайся и обсуждай кино</p>
+
+        <input
+                id="usernameInput"
+                type="text"
+                placeholder="Твоё имя"
+                maxlength="20"
+                required
+                autocomplete="username"
+        >
+
+        <button type="submit">Войти в чат</button>
+        <div class="error" id="loginError"></div>
+    </form>
+</div>
+
+<div class="chat-layout hidden" id="chatLayout">
+
+    <aside class="sidebar">
+        <div class="brand">
+            <h2>Movie Chat</h2>
+            <span class="online-indicator"></span>
+        </div>
+
+        <div class="sidebar-title">
+            Участники онлайн
+            <span id="onlineCount">0</span>
+        </div>
+
+        <ul id="usersList" class="users-list"></ul>
+
+        <div class="current-user">
+            <span class="avatar" id="currentAvatar">?</span>
+            <span id="currentUsername">Гость</span>
+        </div>
+    </aside>
+
+    <main class="chat-main">
+        <header class="chat-header">
+            <div>
+                <h2>Общая комната</h2>
+                <p>Общайтесь и делитесь впечатлениями о фильмах</p>
+            </div>
+            <button id="logoutButton" class="logout-button">Выйти</button>
+        </header>
+
+        <section class="messages" id="messages">
+            <div class="empty-state" id="emptyState">
+                <h3>Добро пожаловать!</h3>
+                <p>Начни общение первым.</p>
+            </div>
+        </section>
+
+        <form class="message-form" id="messageForm">
+            <input
+                    id="messageInput"
+                    type="text"
+                    placeholder="Напиши сообщение..."
+                    autocomplete="off"
+                    maxlength="2000"
+                    required
+            >
+            <button type="submit">Отправить</button>
+        </form>
+    </main>
+
+</div>
+
+</body>
+</html>
